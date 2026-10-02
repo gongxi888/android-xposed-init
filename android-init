@@ -89,8 +89,18 @@ find . -type f \( -name "*.gradle" -o -name "*.java" -o -name "*.xml" -o -name "
     -e "s/zhongqingsong/$AUTHOR_NAME/g" \
     {} +
 
+# 修复 AndroidManifest.xml 中的 Activity 名称
+echo "4. 修复 AndroidManifest.xml..."
+sed -i "s/android:name=\"com\.zqstudio\.easyxposed\.MainActivity\"/android:name=\"${PACKAGE_NAME}.MainActivity\"/g" app/src/main/AndroidManifest.xml
+sed -i "s/android:name=\"${TEMPLATE_PACKAGE}\.MainActivity\"/android:name=\"${PACKAGE_NAME}.MainActivity\"/g" app/src/main/AndroidManifest.xml
+
+# 修复 app/build.gradle 中的 applicationId
+echo "5. 修复 app/build.gradle..."
+sed -i "s/applicationId \"com\.zqstudio\.easyxposed\"/applicationId \"${PACKAGE_NAME}\"/g" app/build.gradle
+sed -i "s/applicationId \"${TEMPLATE_PACKAGE}\"/applicationId \"${PACKAGE_NAME}\"/g" app/build.gradle
+
 # 配置 Gradle 镜像源
-echo "4. 配置 Gradle 镜像源..."
+echo "6. 配置 Gradle 镜像源..."
 cat > gradle/wrapper/gradle-wrapper.properties << 'EOF'
 distributionBase=GRADLE_USER_HOME
 distributionPath=wrapper/dists
@@ -100,7 +110,7 @@ zipStorePath=wrapper/dists
 EOF
 
 # 配置 aapt2 覆盖
-echo "5. 配置 aapt2 路径..."
+echo "7. 配置 aapt2 路径..."
 cat >> gradle.properties << 'EOF'
 
 # Termux aarch64 编译配置
@@ -109,7 +119,7 @@ org.gradle.jvmargs=-Xmx2048m
 EOF
 
 # 配置 settings.gradle 镜像源
-echo "6. 配置依赖镜像源..."
+echo "8. 配置依赖镜像源..."
 cat > settings.gradle << EOF
 pluginManagement {
     repositories {
@@ -136,7 +146,7 @@ include ':app'
 EOF
 
 # 配置 local.properties
-echo "7. 配置 SDK 路径..."
+echo "9. 配置 SDK 路径..."
 cat > local.properties << 'EOF'
 sdk.dir=/data/data/com.termux/files/home/android/sdk
 EOF
