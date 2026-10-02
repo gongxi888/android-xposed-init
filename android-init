@@ -1,6 +1,6 @@
 #!/data/data/com.termux/files/usr/bin/bash
-# Android Xposed 模块项目生成器
-# 基于 EasyXposed 模板，自动配置 Termux aarch64 编译环境
+# Android 项目生成器
+# 支持 Xposed 模块和空白 Android 项目
 
 set -e
 
@@ -11,33 +11,50 @@ TEMPLATE_PACKAGE="com.zhongqingsong.easyxposed"
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 RED='\033[0;31m'
+YELLOW='\033[0;33m'
 NC='\033[0m'
 
-echo -e "${BLUE}=== Android Xposed 模块项目生成器 ===${NC}\n"
+echo -e "${BLUE}=== Android 项目生成器 ===${NC}\n"
 
-# 检查模板是否存在
-if [ ! -d "$TEMPLATE_DIR" ]; then
-    echo -e "${RED}错误: 未找到 EasyXposed 模板${NC}"
-    echo "请先运行: git clone https://github.com/zhongqingsong/EasyXposed.git ~/EasyXposed"
+# 选择项目类型
+echo -e "${YELLOW}选择项目类型：${NC}"
+echo "  1) Xposed Hook 模块"
+echo "  2) 空白 Android 项目"
+read -p "请选择 (1/2): " PROJECT_TYPE
+
+if [[ "$PROJECT_TYPE" != "1" && "$PROJECT_TYPE" != "2" ]]; then
+    echo -e "${RED}无效选择${NC}"
     exit 1
 fi
 
+# Xposed 模块需要检查模板
+if [ "$PROJECT_TYPE" = "1" ]; then
+    if [ ! -d "$TEMPLATE_DIR" ]; then
+        echo -e "${RED}错误: 未找到 EasyXposed 模板${NC}"
+        echo "请先运行: git clone https://github.com/zhongqingsong/EasyXposed.git ~/EasyXposed"
+        exit 1
+    fi
+fi
+
 # 交互式输入
-read -p "项目名 (英文,如 MyHookModule): " PROJECT_NAME
+echo ""
+read -p "项目名 (英文,如 MyApp): " PROJECT_NAME
 if [ -z "$PROJECT_NAME" ]; then
     echo -e "${RED}项目名不能为空${NC}"
     exit 1
 fi
 
-read -p "包名 (如 com.example.myhook): " PACKAGE_NAME
+read -p "包名 (如 com.example.myapp): " PACKAGE_NAME
 if [ -z "$PACKAGE_NAME" ]; then
     echo -e "${RED}包名不能为空${NC}"
     exit 1
 fi
 
-read -p "模块描述 (显示在 LSPosed 中): " MODULE_DESC
-if [ -z "$MODULE_DESC" ]; then
-    MODULE_DESC="Xposed Hook Module"
+if [ "$PROJECT_TYPE" = "1" ]; then
+    read -p "模块描述 (显示在 LSPosed 中): " MODULE_DESC
+    if [ -z "$MODULE_DESC" ]; then
+        MODULE_DESC="Xposed Hook Module"
+    fi
 fi
 
 read -p "作者名: " AUTHOR_NAME
@@ -54,50 +71,216 @@ fi
 
 echo -e "\n${BLUE}开始生成项目...${NC}\n"
 
-# 复制模板
-echo "1. 复制模板文件..."
-cp -r "$TEMPLATE_DIR" "$PROJECT_DIR"
-cd "$PROJECT_DIR"
-
-# 清理 git 历史
-rm -rf .git
-
-# 替换包名路径
 PACKAGE_PATH=$(echo $PACKAGE_NAME | tr '.' '/')
-TEMPLATE_PATH="com/zhongqingsong/easyxposed"
 
-echo "2. 重命名包目录..."
-mkdir -p "app/src/main/java/$PACKAGE_PATH"
-if [ -d "app/src/main/java/$TEMPLATE_PATH" ]; then
-    cp -r "app/src/main/java/$TEMPLATE_PATH"/* "app/src/main/java/$PACKAGE_PATH/"
-    rm -rf app/src/main/java/com
+if [ "$PROJECT_TYPE" = "1" ]; then
+    #==================== Xposed 模块项目 ====================
+    
+    # 复制模板
+    echo "1. 复制模板文件..."
+    cp -r "$TEMPLATE_DIR" "$PROJECT_DIR"
+    cd "$PROJECT_DIR"
+    
+    # 清理 git 历史
+    rm -rf .git
+    
+    # 替换包名路径
+    TEMPLATE_PATH="com/zhongqingsong/easyxposed"
+    
+    echo "2. 重命名包目录..."
+    mkdir -p "app/src/main/java/$PACKAGE_PATH"
+    if [ -d "app/src/main/java/$TEMPLATE_PATH" ]; then
+        cp -r "app/src/main/java/$TEMPLATE_PATH"/* "app/src/main/java/$PACKAGE_PATH/"
+        rm -rf app/src/main/java/com
+    fi
+    
+    # 替换所有文件中的包名和项目名
+    echo "3. 替换包名和项目信息..."
+    find . -type f -name "*.java" -exec sed -i \
+        -e "s/^package com\.zqstudio\.easyxposed;/package $PACKAGE_NAME;/g" \
+        -e "s/^package $TEMPLATE_PACKAGE;/package $PACKAGE_NAME;/g" \
+        {} +
+    find . -type f \( -name "*.gradle" -o -name "*.java" -o -name "*.xml" -o -name "*.properties" \) -exec sed -i \
+        -e "s/$TEMPLATE_PACKAGE/$PACKAGE_NAME/g" \
+        -e "s/com\.zqstudio\.easyxposed/$PACKAGE_NAME/g" \
+        -e "s/EasyXposed/$PROJECT_NAME/g" \
+        -e "s/EasyHook Module/$MODULE_DESC/g" \
+        -e "s/zhongqingsong/$AUTHOR_NAME/g" \
+        {} +
+    
+    # 修复 AndroidManifest.xml
+    echo "4. 修复 AndroidManifest.xml..."
+    sed -i "s/android:name=\"com\.zqstudio\.easyxposed\.MainActivity\"/android:name=\"${PACKAGE_NAME}.MainActivity\"/g" app/src/main/AndroidManifest.xml
+    sed -i "s/android:name=\"${TEMPLATE_PACKAGE}\.MainActivity\"/android:name=\"${PACKAGE_NAME}.MainActivity\"/g" app/src/main/AndroidManifest.xml
+    
+    # 修复 app/build.gradle
+    echo "5. 修复 app/build.gradle..."
+    sed -i "s/applicationId \"com\.zqstudio\.easyxposed\"/applicationId \"${PACKAGE_NAME}\"/g" app/build.gradle
+    sed -i "s/applicationId \"${TEMPLATE_PACKAGE}\"/applicationId \"${PACKAGE_NAME}\"/g" app/build.gradle
+    
+else
+    #==================== 空白 Android 项目 ====================
+    
+    echo "1. 创建项目结构..."
+    mkdir -p "$PROJECT_DIR"
+    cd "$PROJECT_DIR"
+    
+    # 创建目录结构
+    mkdir -p app/src/main/java/$PACKAGE_PATH
+    mkdir -p app/src/main/res/layout
+    mkdir -p app/src/main/res/values
+    mkdir -p app/src/main/res/mipmap-hdpi
+    mkdir -p app/src/main/res/mipmap-mdpi
+    mkdir -p app/src/main/res/mipmap-xhdpi
+    mkdir -p app/src/main/res/mipmap-xxhdpi
+    mkdir -p app/src/main/res/mipmap-xxxhdpi
+    mkdir -p gradle/wrapper
+    
+    # 创建 MainActivity.java
+    echo "2. 生成 MainActivity.java..."
+    cat > "app/src/main/java/$PACKAGE_PATH/MainActivity.java" << EOF
+package $PACKAGE_NAME;
+
+import android.os.Bundle;
+import androidx.appcompat.app.AppCompatActivity;
+
+public class MainActivity extends AppCompatActivity {
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+    }
+}
+EOF
+    
+    # 创建 activity_main.xml
+    echo "3. 生成布局文件..."
+    cat > app/src/main/res/layout/activity_main.xml << 'EOF'
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:padding="16dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Hello Android!"
+        android:textSize="24sp" />
+
+</LinearLayout>
+EOF
+    
+    # 创建 strings.xml
+    cat > app/src/main/res/values/strings.xml << EOF
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">$PROJECT_NAME</string>
+</resources>
+EOF
+    
+    # 创建 styles.xml
+    cat > app/src/main/res/values/styles.xml << 'EOF'
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
+    </style>
+</resources>
+EOF
+    
+    # 创建 AndroidManifest.xml
+    echo "4. 生成 AndroidManifest.xml..."
+    cat > app/src/main/AndroidManifest.xml << EOF
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme">
+        
+        <activity android:name="${PACKAGE_NAME}.MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>
+EOF
+    
+    # 创建 app/build.gradle
+    echo "5. 生成 build.gradle..."
+    cat > app/build.gradle << EOF
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace '$PACKAGE_NAME'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "$PACKAGE_NAME"
+        minSdk 21
+        targetSdk 35
+        
+        versionCode 1
+        versionName "1.0"
+    }
+    
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+}
+EOF
+    
+    # 创建根 build.gradle
+    cat > build.gradle << 'EOF'
+// Top-level build file
+buildscript {
+    repositories {
+        maven { url 'https://maven.aliyun.com/repository/google' }
+        maven { url 'https://maven.aliyun.com/repository/public' }
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.0.2'
+    }
+}
+EOF
+    
+    # 创建 gradlew
+    echo "6. 生成 Gradle Wrapper..."
+    cat > gradlew << 'EOF'
+#!/usr/bin/env sh
+APP_HOME=$( cd "${APP_HOME:-./}" && pwd -P )
+GRADLE_OPTS="-Dorg.gradle.appname=$APP_BASE_NAME -Dorg.gradle.wrapper.gradleUserHome=$HOME/.gradle"
+exec "$APP_HOME/gradle/wrapper/gradle-wrapper.jar" "$@"
+EOF
+    chmod +x gradlew
+    
+    # 创建空的 proguard-rules.pro
+    touch app/proguard-rules.pro
 fi
 
-# 替换所有文件中的包名和项目名
-echo "3. 替换包名和项目信息..."
-# 先替换包声明（Java 文件第一行）
-find . -type f -name "*.java" -exec sed -i \
-    -e "s/^package com\.zqstudio\.easyxposed;/package $PACKAGE_NAME;/g" \
-    -e "s/^package $TEMPLATE_PACKAGE;/package $PACKAGE_NAME;/g" \
-    {} +
-# 再替换其他文件中的包名和项目信息
-find . -type f \( -name "*.gradle" -o -name "*.java" -o -name "*.xml" -o -name "*.properties" \) -exec sed -i \
-    -e "s/$TEMPLATE_PACKAGE/$PACKAGE_NAME/g" \
-    -e "s/com\.zqstudio\.easyxposed/$PACKAGE_NAME/g" \
-    -e "s/EasyXposed/$PROJECT_NAME/g" \
-    -e "s/EasyHook Module/$MODULE_DESC/g" \
-    -e "s/zhongqingsong/$AUTHOR_NAME/g" \
-    {} +
-
-# 修复 AndroidManifest.xml 中的 Activity 名称
-echo "4. 修复 AndroidManifest.xml..."
-sed -i "s/android:name=\"com\.zqstudio\.easyxposed\.MainActivity\"/android:name=\"${PACKAGE_NAME}.MainActivity\"/g" app/src/main/AndroidManifest.xml
-sed -i "s/android:name=\"${TEMPLATE_PACKAGE}\.MainActivity\"/android:name=\"${PACKAGE_NAME}.MainActivity\"/g" app/src/main/AndroidManifest.xml
-
-# 修复 app/build.gradle 中的 applicationId
-echo "5. 修复 app/build.gradle..."
-sed -i "s/applicationId \"com\.zqstudio\.easyxposed\"/applicationId \"${PACKAGE_NAME}\"/g" app/build.gradle
-sed -i "s/applicationId \"${TEMPLATE_PACKAGE}\"/applicationId \"${PACKAGE_NAME}\"/g" app/build.gradle
+# ==================== 通用配置（两种项目都需要）====================
 
 # 配置 Gradle 镜像源
 echo "6. 配置 Gradle 镜像源..."
@@ -109,16 +292,16 @@ zipStoreBase=GRADLE_USER_HOME
 zipStorePath=wrapper/dists
 EOF
 
-# 配置 aapt2 覆盖
+# 配置 gradle.properties
 echo "7. 配置 aapt2 路径..."
-cat >> gradle.properties << 'EOF'
-
+cat > gradle.properties << 'EOF'
 # Termux aarch64 编译配置
 android.aapt2FromMavenOverride=/data/data/com.termux/files/home/android/sdk/build-tools/34.0.0/aapt2
 org.gradle.jvmargs=-Xmx2048m
+android.useAndroidX=true
 EOF
 
-# 配置 settings.gradle 镜像源
+# 配置 settings.gradle
 echo "8. 配置依赖镜像源..."
 cat > settings.gradle << EOF
 pluginManagement {
@@ -136,7 +319,15 @@ dependencyResolutionManagement {
     repositories {
         maven { url 'https://maven.aliyun.com/repository/google' }
         maven { url 'https://maven.aliyun.com/repository/public' }
+EOF
+
+if [ "$PROJECT_TYPE" = "1" ]; then
+    cat >> settings.gradle << EOF
         maven { url 'https://api.xposed.info/' }
+EOF
+fi
+
+cat >> settings.gradle << EOF
         google()
         mavenCentral()
     }
@@ -156,15 +347,24 @@ chmod +x gradlew
 
 echo -e "\n${GREEN}✓ 项目生成完成！${NC}\n"
 echo -e "${BLUE}项目信息：${NC}"
+echo "  类型: $([ "$PROJECT_TYPE" = "1" ] && echo "Xposed 模块" || echo "空白项目")"
 echo "  名称: $PROJECT_NAME"
 echo "  包名: $PACKAGE_NAME"
-echo "  描述: $MODULE_DESC"
+if [ "$PROJECT_TYPE" = "1" ]; then
+    echo "  描述: $MODULE_DESC"
+fi
 echo "  作者: $AUTHOR_NAME"
 echo "  路径: $PROJECT_DIR"
 echo ""
 echo -e "${BLUE}下一步操作：${NC}"
 echo "  cd $PROJECT_DIR"
-echo "  ./gradlew build"
+echo "  ./gradlew assembleDebug"
 echo ""
-echo -e "${BLUE}开发入口文件：${NC}"
-echo "  app/src/main/java/$PACKAGE_PATH/EasyHooker.java"
+if [ "$PROJECT_TYPE" = "1" ]; then
+    echo -e "${BLUE}开发入口文件：${NC}"
+    echo "  app/src/main/java/$PACKAGE_PATH/EasyHooker.java"
+else
+    echo -e "${BLUE}主要文件：${NC}"
+    echo "  app/src/main/java/$PACKAGE_PATH/MainActivity.java"
+    echo "  app/src/main/res/layout/activity_main.xml"
+fi
