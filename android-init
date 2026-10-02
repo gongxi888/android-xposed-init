@@ -75,8 +75,15 @@ fi
 
 # 替换所有文件中的包名和项目名
 echo "3. 替换包名和项目信息..."
+# 先替换包声明（Java 文件第一行）
+find . -type f -name "*.java" -exec sed -i \
+    -e "s/^package com\.zqstudio\.easyxposed;/package $PACKAGE_NAME;/g" \
+    -e "s/^package $TEMPLATE_PACKAGE;/package $PACKAGE_NAME;/g" \
+    {} +
+# 再替换其他文件中的包名和项目信息
 find . -type f \( -name "*.gradle" -o -name "*.java" -o -name "*.xml" -o -name "*.properties" \) -exec sed -i \
     -e "s/$TEMPLATE_PACKAGE/$PACKAGE_NAME/g" \
+    -e "s/com\.zqstudio\.easyxposed/$PACKAGE_NAME/g" \
     -e "s/EasyXposed/$PROJECT_NAME/g" \
     -e "s/EasyHook Module/$MODULE_DESC/g" \
     -e "s/zhongqingsong/$AUTHOR_NAME/g" \
