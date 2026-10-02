@@ -1,0 +1,153 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# Android Xposed 模块项目生成器
+# 基于 EasyXposed 模板，自动配置 Termux aarch64 编译环境
+
+set -e
+
+TEMPLATE_DIR="$HOME/EasyXposed"
+TEMPLATE_PACKAGE="com.zhongqingsong.easyxposed"
+
+# 颜色输出
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+echo -e "${BLUE}=== Android Xposed 模块项目生成器 ===${NC}\n"
+
+# 检查模板是否存在
+if [ ! -d "$TEMPLATE_DIR" ]; then
+    echo -e "${RED}错误: 未找到 EasyXposed 模板${NC}"
+    echo "请先运行: git clone https://github.com/zhongqingsong/EasyXposed.git ~/EasyXposed"
+    exit 1
+fi
+
+# 交互式输入
+read -p "项目名 (英文,如 MyHookModule): " PROJECT_NAME
+if [ -z "$PROJECT_NAME" ]; then
+    echo -e "${RED}项目名不能为空${NC}"
+    exit 1
+fi
+
+read -p "包名 (如 com.example.myhook): " PACKAGE_NAME
+if [ -z "$PACKAGE_NAME" ]; then
+    echo -e "${RED}包名不能为空${NC}"
+    exit 1
+fi
+
+read -p "模块描述 (显示在 LSPosed 中): " MODULE_DESC
+if [ -z "$MODULE_DESC" ]; then
+    MODULE_DESC="Xposed Hook Module"
+fi
+
+read -p "作者名: " AUTHOR_NAME
+if [ -z "$AUTHOR_NAME" ]; then
+    AUTHOR_NAME="Unknown"
+fi
+
+# 生成项目目录
+PROJECT_DIR="$HOME/$PROJECT_NAME"
+if [ -d "$PROJECT_DIR" ]; then
+    echo -e "${RED}错误: 目录 $PROJECT_DIR 已存在${NC}"
+    exit 1
+fi
+
+echo -e "\n${BLUE}开始生成项目...${NC}\n"
+
+# 复制模板
+echo "1. 复制模板文件..."
+cp -r "$TEMPLATE_DIR" "$PROJECT_DIR"
+cd "$PROJECT_DIR"
+
+# 清理 git 历史
+rm -rf .git
+
+# 替换包名路径
+PACKAGE_PATH=$(echo $PACKAGE_NAME | tr '.' '/')
+TEMPLATE_PATH="com/zhongqingsong/easyxposed"
+
+echo "2. 重命名包目录..."
+mkdir -p "app/src/main/java/$PACKAGE_PATH"
+if [ -d "app/src/main/java/$TEMPLATE_PATH" ]; then
+    cp -r "app/src/main/java/$TEMPLATE_PATH"/* "app/src/main/java/$PACKAGE_PATH/"
+    rm -rf app/src/main/java/com
+fi
+
+# 替换所有文件中的包名和项目名
+echo "3. 替换包名和项目信息..."
+find . -type f \( -name "*.gradle" -o -name "*.java" -o -name "*.xml" -o -name "*.properties" \) -exec sed -i \
+    -e "s/$TEMPLATE_PACKAGE/$PACKAGE_NAME/g" \
+    -e "s/EasyXposed/$PROJECT_NAME/g" \
+    -e "s/EasyHook Module/$MODULE_DESC/g" \
+    -e "s/zhongqingsong/$AUTHOR_NAME/g" \
+    {} +
+
+# 配置 Gradle 镜像源
+echo "4. 配置 Gradle 镜像源..."
+cat > gradle/wrapper/gradle-wrapper.properties << 'EOF'
+distributionBase=GRADLE_USER_HOME
+distributionPath=wrapper/dists
+distributionUrl=https\://mirrors.cloud.tencent.com/gradle/gradle-8.0-bin.zip
+zipStoreBase=GRADLE_USER_HOME
+zipStorePath=wrapper/dists
+EOF
+
+# 配置 aapt2 覆盖
+echo "5. 配置 aapt2 路径..."
+cat >> gradle.properties << 'EOF'
+
+# Termux aarch64 编译配置
+android.aapt2FromMavenOverride=/data/data/com.termux/files/home/android/sdk/build-tools/34.0.0/aapt2
+org.gradle.jvmargs=-Xmx2048m
+EOF
+
+# 配置 settings.gradle 镜像源
+echo "6. 配置依赖镜像源..."
+cat > settings.gradle << EOF
+pluginManagement {
+    repositories {
+        maven { url 'https://maven.aliyun.com/repository/google' }
+        maven { url 'https://maven.aliyun.com/repository/public' }
+        maven { url 'https://maven.aliyun.com/repository/gradle-plugin' }
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        maven { url 'https://maven.aliyun.com/repository/google' }
+        maven { url 'https://maven.aliyun.com/repository/public' }
+        maven { url 'https://api.xposed.info/' }
+        google()
+        mavenCentral()
+    }
+}
+rootProject.name = "$PROJECT_NAME"
+include ':app'
+EOF
+
+# 配置 local.properties
+echo "7. 配置 SDK 路径..."
+cat > local.properties << 'EOF'
+sdk.dir=/data/data/com.termux/files/home/android/sdk
+EOF
+
+# 赋予 gradlew 执行权限
+chmod +x gradlew
+
+echo -e "\n${GREEN}✓ 项目生成完成！${NC}\n"
+echo -e "${BLUE}项目信息：${NC}"
+echo "  名称: $PROJECT_NAME"
+echo "  包名: $PACKAGE_NAME"
+echo "  描述: $MODULE_DESC"
+echo "  作者: $AUTHOR_NAME"
+echo "  路径: $PROJECT_DIR"
+echo ""
+echo -e "${BLUE}下一步操作：${NC}"
+echo "  cd $PROJECT_DIR"
+echo "  ./gradlew build"
+echo ""
+echo -e "${BLUE}开发入口文件：${NC}"
+echo "  app/src/main/java/$PACKAGE_PATH/EasyHooker.java"
