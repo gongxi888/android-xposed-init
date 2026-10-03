@@ -266,16 +266,6 @@ buildscript {
 }
 EOF
     
-    # 创建 gradlew
-    echo "6. 生成 Gradle Wrapper..."
-    cat > gradlew << 'EOF'
-#!/usr/bin/env sh
-APP_HOME=$( cd "${APP_HOME:-./}" && pwd -P )
-GRADLE_OPTS="-Dorg.gradle.appname=$APP_BASE_NAME -Dorg.gradle.wrapper.gradleUserHome=$HOME/.gradle"
-exec "$APP_HOME/gradle/wrapper/gradle-wrapper.jar" "$@"
-EOF
-    chmod +x gradlew
-    
     # 创建空的 proguard-rules.pro
     touch app/proguard-rules.pro
 fi
@@ -342,8 +332,14 @@ cat > local.properties << 'EOF'
 sdk.dir=/data/data/com.termux/files/home/android/sdk
 EOF
 
+# 空白项目需要初始化 Gradle Wrapper
+if [ "$PROJECT_TYPE" = "2" ]; then
+    echo "10. 初始化 Gradle Wrapper..."
+    gradle wrapper --gradle-version=8.0
+fi
+
 # 赋予 gradlew 执行权限
-chmod +x gradlew
+chmod +x gradlew 2>/dev/null || true
 
 echo -e "\n${GREEN}✓ 项目生成完成！${NC}\n"
 echo -e "${BLUE}项目信息：${NC}"
