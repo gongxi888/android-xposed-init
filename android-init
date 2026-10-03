@@ -335,15 +335,16 @@ EOF
 # 空白项目需要初始化 Gradle Wrapper
 if [ "$PROJECT_TYPE" = "2" ]; then
     echo "10. 初始化 Gradle Wrapper..."
-    # 使用本地 Gradle 生成 wrapper，不下载新版本
-    gradle wrapper --gradle-distribution-url file://$HOME/.gradle/wrapper/dists/gradle-8.0-bin/*/gradle-8.0-bin.zip
     
-    # 如果上面失败，直接从 EasyXposed 模板复制
-    if [ ! -f "gradlew" ] && [ -d "$HOME/EasyXposed/gradle/wrapper" ]; then
-        echo "   从模板复制 Gradle Wrapper..."
+    # 直接从 EasyXposed 模板复制（最可靠）
+    if [ -d "$HOME/EasyXposed/gradle/wrapper" ]; then
+        echo "   从 EasyXposed 模板复制 Gradle Wrapper..."
         cp -r "$HOME/EasyXposed/gradle" ./
         cp "$HOME/EasyXposed/gradlew" ./
         cp "$HOME/EasyXposed/gradlew.bat" ./ 2>/dev/null || true
+    else
+        echo "   ${RED}警告: 未找到 EasyXposed 模板，尝试在线生成...${NC}"
+        gradle wrapper --gradle-version=8.0 || true
     fi
 fi
 
