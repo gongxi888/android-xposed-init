@@ -199,10 +199,8 @@ EOF
 
     <application
         android:allowBackup="true"
-        android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
-        android:supportsRtl="true"
-        android:theme="@style/AppTheme">
+        android:supportsRtl="true">
         
         <activity android:name="${PACKAGE_NAME}.MainActivity"
             android:exported="true">
@@ -225,12 +223,12 @@ plugins {
 
 android {
     namespace '$PACKAGE_NAME'
-    compileSdk 35
+    compileSdk 34
 
     defaultConfig {
         applicationId "$PACKAGE_NAME"
         minSdk 21
-        targetSdk 35
+        targetSdk 34
         
         versionCode 1
         versionName "1.0"
